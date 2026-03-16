@@ -1,0 +1,41 @@
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.config import get_settings
+from app.api import data_sources, workflows, agents, runs
+
+settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    yield
+    # Shutdown
+
+
+app = FastAPI(
+    title="MRA Backend",
+    description="Market Research Agent — Backend API",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(data_sources.router, prefix="/api/data-sources", tags=["Data Sources"])
+app.include_router(workflows.router, prefix="/api/workflows", tags=["Workflows"])
+app.include_router(agents.router, prefix="/api/agents", tags=["Agents"])
+app.include_router(runs.router, prefix="/api/runs", tags=["Runs"])
+
+
+@app.get("/api/health")
+async def health_check():
+    return {"status": "ok"}
