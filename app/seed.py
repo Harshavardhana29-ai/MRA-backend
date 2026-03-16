@@ -48,6 +48,7 @@ TOPIC_AGENT_MAP = {
     "Technology": ["News Aggregator", "Data Extractor", "Report Generator"],
     "Finance": ["Trend Detector", "Report Generator", "Data Extractor"],
     "Sports": ["Data Extractor", "Sentiment Analyzer"],
+    "News": ["News Aggregator", "Sentiment Analyzer"],
     "General": ["News Aggregator", "Report Generator"],
     "Healthcare": ["News Aggregator", "Data Extractor"],
     "Energy": ["Trend Detector", "Report Generator"],
