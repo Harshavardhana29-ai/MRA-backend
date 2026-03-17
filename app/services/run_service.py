@@ -93,14 +93,20 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
             await asyncio.sleep(1)
 
             # Step 2: Connect to data sources
-            ds_names = ", ".join([ds.title for ds in data_sources]) if data_sources else "none"
-            await _add_log(db, run_id, f"Connecting to data sources: {ds_names}", "info", _elapsed())
-            run.progress = round((2 / total_steps) * 100, 1)
-            await db.commit()
-            await asyncio.sleep(1)
+            if data_sources:
+                ds_names = ", ".join([ds.title for ds in data_sources])
+                await _add_log(db, run_id, f"Connecting to data sources: {ds_names}", "info", _elapsed())
+                run.progress = round((2 / total_steps) * 100, 1)
+                await db.commit()
+                await asyncio.sleep(1)
 
-            await _add_log(db, run_id, f"Data source connection established ({len(data_sources)} sources)", "success", _elapsed())
-            await db.commit()
+                await _add_log(db, run_id, f"Data source connection established ({len(data_sources)} sources)", "success", _elapsed())
+                await db.commit()
+            else:
+                await _add_log(db, run_id, "Prompt-only mode — no data sources to connect", "info", _elapsed())
+                run.progress = round((2 / total_steps) * 100, 1)
+                await db.commit()
+                await asyncio.sleep(0.5)
 
             # Step 3: Call each agent
             agent_responses: list[str] = []

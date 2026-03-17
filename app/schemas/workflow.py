@@ -9,7 +9,7 @@ class WorkflowCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=500)
     topic: str = Field(..., min_length=1, max_length=100)
     status: str = Field(default="Draft")
-    source_selection_mode: str = Field(default="topic")  # topic, both, individual
+    source_selection_mode: str = Field(default="topic")  # topic, both, individual, prompt_only
     selected_topics: list[str] = Field(default_factory=list)
     data_source_ids: list[UUID] = Field(default_factory=list)
     agent_ids: list[UUID] = Field(default_factory=list)

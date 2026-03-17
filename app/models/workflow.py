@@ -14,7 +14,7 @@ class Workflow(Base):
     title = Column(String(500), nullable=False)
     topic = Column(String(100), nullable=False, index=True)
     status = Column(String(20), nullable=False, default="Draft")  # Active, Draft
-    source_selection_mode = Column(String(20), nullable=False, default="topic")  # topic, both, individual
+    source_selection_mode = Column(String(20), nullable=False, default="topic")  # topic, both, individual, prompt_only
     selected_topics = Column(ARRAY(String(100)), nullable=False, default=list)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
