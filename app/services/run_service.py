@@ -118,7 +118,7 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
                 agent_answer = None
                 if agent.api_url:
                     try:
-                        async with httpx.AsyncClient(timeout=300.0) as client:
+                        async with httpx.AsyncClient(timeout=600.0) as client:
                             # Build the prompt: combine user prompt with data source context
                             prompt = user_prompt or f"Analyze the latest information about {workflow.topic}"
                             if data_sources:
