@@ -3,6 +3,7 @@ from app.models.agent import Agent, AgentTopicMapping
 from app.models.workflow import Workflow, WorkflowDataSource, WorkflowAgent
 from app.models.activity_log import ActivityLog
 from app.models.run import WorkflowRun, RunLog
+from app.models.scheduled_job import ScheduledJob, JobHistory
 
 __all__ = [
     "DataSource",
@@ -14,4 +15,6 @@ __all__ = [
     "ActivityLog",
     "WorkflowRun",
     "RunLog",
+    "ScheduledJob",
+    "JobHistory",
 ]
