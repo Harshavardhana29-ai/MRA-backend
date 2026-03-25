@@ -1,0 +1,347 @@
+swagger: "2.0"
+info:
+  title: mra-backend-api
+  version: "1.0"
+schemes:
+  - https
+x-google-backend:
+  address: https://mra-backend-914025621211.us-central1.run.app
+  path_translation: APPEND_PATH_TO_ADDRESS
+  jwt_audience: https://mra-backend-914025621211.us-central1.run.app
+  deadline: 60.0
+paths:
+  /api/health:
+    get:
+      operationId: health
+      responses:
+        "200":
+          description: OK
+  /api/data-sources:
+    options:
+      operationId: dsOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: dsGET
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: dsPOST
+      parameters:
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "201":
+          description: OK
+  /api/data-sources/stats:
+    options:
+      operationId: dsStatsOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: dsStatsGET
+      responses:
+        "200":
+          description: OK
+  /api/data-sources/activity:
+    options:
+      operationId: dsActOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: dsActGET
+      responses:
+        "200":
+          description: OK
+  /api/data-sources/topics:
+    options:
+      operationId: dsTopOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: dsTopGET
+      responses:
+        "200":
+          description: OK
+  /api/data-sources/tags:
+    options:
+      operationId: dsTagOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: dsTagGET
+      responses:
+        "200":
+          description: OK
+  /api/data-sources/{source_id}:
+    options:
+      operationId: dsIdOPT
+      parameters:
+        - in: path
+          name: source_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: dsIdGET
+      parameters:
+        - in: path
+          name: source_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    put:
+      operationId: dsIdPUT
+      parameters:
+        - in: path
+          name: source_id
+          required: true
+          type: string
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "200":
+          description: OK
+    delete:
+      operationId: dsIdDEL
+      parameters:
+        - in: path
+          name: source_id
+          required: true
+          type: string
+      responses:
+        "204":
+          description: OK
+  /api/workflows:
+    options:
+      operationId: wfOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: wfGET
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: wfPOST
+      parameters:
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "201":
+          description: OK
+  /api/workflows/stats:
+    options:
+      operationId: wfStatsOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: wfStatsGET
+      responses:
+        "200":
+          description: OK
+  /api/workflows/{workflow_id}:
+    options:
+      operationId: wfIdOPT
+      parameters:
+        - in: path
+          name: workflow_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: wfIdGET
+      parameters:
+        - in: path
+          name: workflow_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    put:
+      operationId: wfIdPUT
+      parameters:
+        - in: path
+          name: workflow_id
+          required: true
+          type: string
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "200":
+          description: OK
+    delete:
+      operationId: wfIdDEL
+      parameters:
+        - in: path
+          name: workflow_id
+          required: true
+          type: string
+      responses:
+        "204":
+          description: OK
+  /api/agents:
+    options:
+      operationId: agOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: agGET
+      responses:
+        "200":
+          description: OK
+  /api/agents/by-topics:
+    options:
+      operationId: agTopOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: agTopGET
+      responses:
+        "200":
+          description: OK
+  /api/agents/topic-mapping:
+    options:
+      operationId: agMapOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: agMapGET
+      responses:
+        "200":
+          description: OK
+  /api/runs/workflow/{workflow_id}/run:
+    options:
+      operationId: runWfOPT
+      parameters:
+        - in: path
+          name: workflow_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: runWfPOST
+      parameters:
+        - in: path
+          name: workflow_id
+          required: true
+          type: string
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "202":
+          description: OK
+  /api/runs/{run_id}:
+    options:
+      operationId: runIdOPT
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: runIdGET
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+  /api/runs/{run_id}/status:
+    options:
+      operationId: runStatusOPT
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: runStatusGET
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+  /api/runs/{run_id}/logs:
+    options:
+      operationId: runLogsOPT
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: runLogsGET
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+  /api/runs/{run_id}/report:
+    options:
+      operationId: runReportOPT
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: runReportGET
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
