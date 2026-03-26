@@ -160,7 +160,7 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
                     )
 
                 if agent_answer:
-                    agent_responses.append(f"## {agent.name} Analysis\n\n{agent_answer}")
+                    agent_responses.append(f"\n\n{agent_answer}")
 
                 await db.commit()
                 await asyncio.sleep(0.5)
@@ -171,10 +171,10 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
             await asyncio.sleep(1)
 
             if agent_responses:
-                report = f"# {workflow.title} — Run Report\n\n"
+                report = f"# {workflow.title}\n\n"
                 report += "\n\n---\n\n".join(agent_responses)
             else:
-                report = f"# {workflow.title} — Run Report\n\n"
+                report = f"# {workflow.title}\n\n"
                 report += "No agent responses were collected during this run.\n\n"
                 report += "This could be because:\n"
                 report += "- No agents have API URLs configured\n"
