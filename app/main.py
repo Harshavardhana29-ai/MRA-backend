@@ -1,17 +1,21 @@
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
-from app.api import data_sources, workflows, agents, runs
+from app.api import data_sources, workflows, agents, runs, scheduled_jobs
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-5s %(name)s — %(message)s")
 
 settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    from app.services.scheduler_service import start_scheduler, stop_scheduler
+    await start_scheduler()
     yield
-    # Shutdown
+    await stop_scheduler()
 
 
 app = FastAPI(
@@ -34,6 +38,7 @@ app.include_router(data_sources.router, prefix="/api/data-sources", tags=["Data 
 app.include_router(workflows.router, prefix="/api/workflows", tags=["Workflows"])
 app.include_router(agents.router, prefix="/api/agents", tags=["Agents"])
 app.include_router(runs.router, prefix="/api/runs", tags=["Runs"])
+app.include_router(scheduled_jobs.router, prefix="/api/scheduler", tags=["Scheduler"])
 
 
 @app.get("/api/health")

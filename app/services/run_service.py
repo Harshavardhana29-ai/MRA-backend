@@ -110,6 +110,8 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
 
             # Step 3: Call each agent
             agent_responses: list[str] = []
+            agents_with_urls = [a for a in agents if a.api_url]
+            agent_errors = 0
             for idx, agent in enumerate(agents):
                 step_num = 3 + idx
                 await _add_log(
@@ -120,12 +122,10 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
                 run.progress = round((step_num / total_steps) * 100, 1)
                 await db.commit()
 
-                # Call the agent API if URL is configured
                 agent_answer = None
                 if agent.api_url:
                     try:
                         async with httpx.AsyncClient(timeout=600.0) as client:
-                            # Build the prompt: combine user prompt with data source context
                             prompt = user_prompt or f"Analyze the latest information about {workflow.topic}"
                             if data_sources:
                                 source_context = "\n".join([f"- {ds.title} ({ds.url})" for ds in data_sources])
@@ -146,6 +146,7 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
                             "success", _elapsed(),
                         )
                     except Exception as e:
+                        agent_errors += 1
                         await _add_log(
                             db, run_id,
                             f"Agent: {agent.name} — error: {str(e)[:200]}",
@@ -169,7 +170,6 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
             await db.commit()
             await asyncio.sleep(1)
 
-            # Combine all agent responses into a report
             if agent_responses:
                 report = f"# {workflow.title} — Run Report\n\n"
                 report += "\n\n---\n\n".join(agent_responses)
@@ -182,11 +182,17 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
 
             run.report_markdown = report
             run.progress = 100.0
-            run.status = "completed"
             run.completed_at = datetime.now(timezone.utc)
 
-            await _add_log(db, run_id, "Report generated successfully", "success", _elapsed())
-            await _add_log(db, run_id, "Workflow execution completed", "success", _elapsed())
+            all_configured_failed = len(agents_with_urls) > 0 and agent_errors == len(agents_with_urls)
+            if all_configured_failed:
+                run.status = "failed"
+                await _add_log(db, run_id, "All agent API calls failed — marking run as failed", "error", _elapsed())
+            else:
+                run.status = "completed"
+                await _add_log(db, run_id, "Report generated successfully", "success", _elapsed())
+                await _add_log(db, run_id, "Workflow execution completed", "success", _elapsed())
+
             await db.commit()
 
         except Exception as e:

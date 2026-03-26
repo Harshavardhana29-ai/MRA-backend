@@ -15,5 +15,10 @@ pydantic-settings==2.7.1
 # HTTP client (for agent API calls)
 httpx==0.28.1
 
+# Scheduler
+apscheduler==3.11.2
+croniter==6.2.2
+
 # Utilities
 python-dateutil==2.9.0
+tzdata==2025.2
