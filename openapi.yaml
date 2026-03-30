@@ -1,7 +1,7 @@
 swagger: "2.0"
 info:
   title: mra-backend-api
-  version: "1.0"
+  version: "1.1"
 schemes:
   - https
 x-google-backend:
@@ -16,6 +16,57 @@ paths:
       responses:
         "200":
           description: OK
+
+  /api/auth/sso/sync:
+    options:
+      operationId: authSyncOPT
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: authSyncPOST
+      parameters:
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "200":
+          description: OK
+  /api/auth/me:
+    options:
+      operationId: authMeOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: authMeGET
+      responses:
+        "200":
+          description: OK
+  /api/auth/logout:
+    options:
+      operationId: authLogoutOPT
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: authLogoutPOST
+      responses:
+        "204":
+          description: OK
+  /api/auth/logout-all:
+    options:
+      operationId: authLogoutAllOPT
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: authLogoutAllPOST
+      responses:
+        "204":
+          description: OK
+
   /api/data-sources:
     options:
       operationId: dsOPT
@@ -126,6 +177,7 @@ paths:
       responses:
         "204":
           description: OK
+
   /api/workflows:
     options:
       operationId: wfOPT
@@ -203,6 +255,7 @@ paths:
       responses:
         "204":
           description: OK
+
   /api/agents:
     options:
       operationId: agOPT
@@ -236,6 +289,7 @@ paths:
       responses:
         "200":
           description: OK
+
   /api/runs/workflow/{workflow_id}/run:
     options:
       operationId: runWfOPT
@@ -344,4 +398,227 @@ paths:
           type: string
       responses:
         "200":
+          description: OK
+
+  /api/scheduler/jobs:
+    options:
+      operationId: schedJobsOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: schedJobsGET
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: schedJobsPOST
+      parameters:
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "201":
+          description: OK
+  /api/scheduler/jobs/counts:
+    options:
+      operationId: schedCountsOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: schedCountsGET
+      responses:
+        "200":
+          description: OK
+  /api/scheduler/jobs/{job_id}:
+    options:
+      operationId: schedJobIdOPT
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: schedJobIdGET
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    put:
+      operationId: schedJobIdPUT
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          type: string
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "200":
+          description: OK
+    delete:
+      operationId: schedJobIdDEL
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          type: string
+      responses:
+        "204":
+          description: OK
+  /api/scheduler/jobs/{job_id}/toggle:
+    options:
+      operationId: schedToggleOPT
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: schedTogglePOST
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+  /api/scheduler/jobs/{job_id}/history:
+    options:
+      operationId: schedHistOPT
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: schedHistGET
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+  /api/scheduler/recent-runs:
+    options:
+      operationId: schedRecentOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: schedRecentGET
+      responses:
+        "200":
+          description: OK
+
+  /api/chat/sessions:
+    options:
+      operationId: chatSessOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: chatSessGET
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: chatSessPOST
+      parameters:
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "201":
+          description: OK
+  /api/chat/sessions/{session_id}:
+    options:
+      operationId: chatSessIdOPT
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: chatSessIdGET
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    patch:
+      operationId: chatSessIdPATCH
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          type: string
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "200":
+          description: OK
+    delete:
+      operationId: chatSessIdDEL
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          type: string
+      responses:
+        "204":
+          description: OK
+  /api/chat/sessions/{session_id}/messages:
+    options:
+      operationId: chatMsgOPT
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: chatMsgPOST
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          type: string
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "201":
           description: OK

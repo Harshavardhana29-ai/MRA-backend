@@ -97,8 +97,9 @@ async def logout(
     db: AsyncSession = Depends(get_db),
 ):
     """Revoke the current local session."""
-    auth_header = request.headers.get("authorization", "")
-    token = auth_header.replace("Bearer ", "").strip()
+    forwarded = request.headers.get("x-forwarded-authorization", "")
+    auth_header = forwarded if forwarded.lower().startswith("bearer ") else request.headers.get("authorization", "")
+    token = auth_header.replace("Bearer ", "").replace("bearer ", "").strip()
     await AuthService.revoke_session(db, token)
     await db.commit()
 
