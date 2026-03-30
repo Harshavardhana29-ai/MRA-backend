@@ -16,7 +16,13 @@ from app.schemas.run import (
 )
 
 
-async def start_run(db: AsyncSession, workflow_id: UUID, user_prompt: str) -> RunStartResponse:
+async def start_run(
+    db: AsyncSession,
+    workflow_id: UUID,
+    user_prompt: str,
+    chat_session_id: UUID | None = None,
+    chat_user=None,
+) -> RunStartResponse:
     """Create a new run record and return its ID. Execution happens in background."""
     # Verify workflow exists
     wf = await db.execute(
@@ -37,9 +43,16 @@ async def start_run(db: AsyncSession, workflow_id: UUID, user_prompt: str) -> Ru
     await db.commit()  # Commit NOW so background task can see the record
 
     run_id = run.id
+    user_id = chat_user.id if chat_user else None
 
     # Launch background execution
-    asyncio.create_task(_execute_run(run_id, workflow_id, user_prompt))
+    asyncio.create_task(
+        _execute_run(
+            run_id, workflow_id, user_prompt,
+            chat_session_id=chat_session_id,
+            chat_user_id=user_id,
+        )
+    )
 
     return RunStartResponse(run_id=run_id, status="running")
 
@@ -55,7 +68,13 @@ async def _add_log(db: AsyncSession, run_id: UUID, message: str, log_type: str, 
     await db.flush()
 
 
-async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
+async def _execute_run(
+    run_id: UUID,
+    workflow_id: UUID,
+    user_prompt: str,
+    chat_session_id: UUID | None = None,
+    chat_user_id: UUID | None = None,
+):
     """Background task: call each agent API and build a combined report."""
     start_time = time.monotonic()
 
@@ -131,6 +150,15 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
                                 source_context = "\n".join([f"- {ds.title} ({ds.url})" for ds in data_sources])
                                 prompt = f"{prompt}\n\nData Sources:\n{source_context}"
 
+                            # System instruction appended to every agent request
+                            prompt += (
+                                "\n\nNote: Instead of generating responses sequentially "
+                                "from multiple agents, execute them concurrently and "
+                                "present a single, unified report that combines the "
+                                "results from all concurrent processes without splitting "
+                                "the output."
+                            )
+
                             response = await client.post(
                                 agent.api_url,
                                 json={"question": prompt},
@@ -194,6 +222,31 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
                 await _add_log(db, run_id, "Workflow execution completed", "success", _elapsed())
 
             await db.commit()
+
+            # ── Save report as assistant chat message ──
+            if chat_session_id and chat_user_id:
+                try:
+                    from app.models.chat import ChatMessage, ChatSession
+                    msg = ChatMessage(
+                        session_id=chat_session_id,
+                        role="assistant",
+                        content=report,
+                        message_type="report" if not all_configured_failed else "error",
+                        workflow_id=workflow_id,
+                        run_id=run_id,
+                        workflow_title=workflow.title,
+                    )
+                    db.add(msg)
+                    # Touch session updated_at
+                    sess_q = await db.execute(
+                        select(ChatSession).where(ChatSession.id == chat_session_id)
+                    )
+                    sess = sess_q.scalar_one_or_none()
+                    if sess:
+                        sess.updated_at = datetime.now(timezone.utc)
+                    await db.commit()
+                except Exception as chat_err:
+                    print(f"[RUN {run_id}] Failed to save chat message: {chat_err}")
 
         except Exception as e:
             import traceback
