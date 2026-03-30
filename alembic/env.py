@@ -27,6 +27,9 @@ from app.models.workflow import Workflow, WorkflowDataSource, WorkflowAgent
 from app.models.activity_log import ActivityLog
 from app.models.run import WorkflowRun, RunLog
  
+from app.models.scheduled_job import ScheduledJob, ScheduledJobRun
+from app.models.user import User, UserSession
+
 target_metadata = Base.metadata
  
  

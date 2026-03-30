@@ -16,7 +16,13 @@ from app.schemas.run import (
 )
 
 
-async def start_run(db: AsyncSession, workflow_id: UUID, user_prompt: str) -> RunStartResponse:
+async def start_run(
+    db: AsyncSession,
+    workflow_id: UUID,
+    user_prompt: str,
+    chat_session_id: UUID | None = None,
+    chat_user=None,
+) -> RunStartResponse:
     """Create a new run record and return its ID. Execution happens in background."""
     # Verify workflow exists
     wf = await db.execute(
@@ -37,9 +43,16 @@ async def start_run(db: AsyncSession, workflow_id: UUID, user_prompt: str) -> Ru
     await db.commit()  # Commit NOW so background task can see the record
 
     run_id = run.id
+    user_id = chat_user.id if chat_user else None
 
     # Launch background execution
-    asyncio.create_task(_execute_run(run_id, workflow_id, user_prompt))
+    asyncio.create_task(
+        _execute_run(
+            run_id, workflow_id, user_prompt,
+            chat_session_id=chat_session_id,
+            chat_user_id=user_id,
+        )
+    )
 
     return RunStartResponse(run_id=run_id, status="running")
 
@@ -55,7 +68,13 @@ async def _add_log(db: AsyncSession, run_id: UUID, message: str, log_type: str, 
     await db.flush()
 
 
-async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
+async def _execute_run(
+    run_id: UUID,
+    workflow_id: UUID,
+    user_prompt: str,
+    chat_session_id: UUID | None = None,
+    chat_user_id: UUID | None = None,
+):
     """Background task: call each agent API and build a combined report."""
     start_time = time.monotonic()
 
@@ -110,6 +129,8 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
 
             # Step 3: Call each agent
             agent_responses: list[str] = []
+            agents_with_urls = [a for a in agents if a.api_url]
+            agent_errors = 0
             for idx, agent in enumerate(agents):
                 step_num = 3 + idx
                 await _add_log(
@@ -120,16 +141,23 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
                 run.progress = round((step_num / total_steps) * 100, 1)
                 await db.commit()
 
-                # Call the agent API if URL is configured
                 agent_answer = None
                 if agent.api_url:
                     try:
                         async with httpx.AsyncClient(timeout=600.0) as client:
-                            # Build the prompt: combine user prompt with data source context
                             prompt = user_prompt or f"Analyze the latest information about {workflow.topic}"
                             if data_sources:
                                 source_context = "\n".join([f"- {ds.title} ({ds.url})" for ds in data_sources])
                                 prompt = f"{prompt}\n\nData Sources:\n{source_context}"
+
+                            # System instruction appended to every agent request
+                            prompt += (
+                                "\n\nNote: Instead of generating responses sequentially "
+                                "from multiple agents, execute them concurrently and "
+                                "present a single, unified report that combines the "
+                                "results from all concurrent processes without splitting "
+                                "the output."
+                            )
 
                             response = await client.post(
                                 agent.api_url,
@@ -146,6 +174,7 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
                             "success", _elapsed(),
                         )
                     except Exception as e:
+                        agent_errors += 1
                         await _add_log(
                             db, run_id,
                             f"Agent: {agent.name} — error: {str(e)[:200]}",
@@ -159,7 +188,7 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
                     )
 
                 if agent_answer:
-                    agent_responses.append(f"## {agent.name} Analysis\n\n{agent_answer}")
+                    agent_responses.append(f"\n\n{agent_answer}")
 
                 await db.commit()
                 await asyncio.sleep(0.5)
@@ -169,12 +198,11 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
             await db.commit()
             await asyncio.sleep(1)
 
-            # Combine all agent responses into a report
             if agent_responses:
-                report = f"# {workflow.title} — Run Report\n\n"
+                report = f"# {workflow.title}\n\n"
                 report += "\n\n---\n\n".join(agent_responses)
             else:
-                report = f"# {workflow.title} — Run Report\n\n"
+                report = f"# {workflow.title}\n\n"
                 report += "No agent responses were collected during this run.\n\n"
                 report += "This could be because:\n"
                 report += "- No agents have API URLs configured\n"
@@ -182,12 +210,43 @@ async def _execute_run(run_id: UUID, workflow_id: UUID, user_prompt: str):
 
             run.report_markdown = report
             run.progress = 100.0
-            run.status = "completed"
             run.completed_at = datetime.now(timezone.utc)
 
-            await _add_log(db, run_id, "Report generated successfully", "success", _elapsed())
-            await _add_log(db, run_id, "Workflow execution completed", "success", _elapsed())
+            all_configured_failed = len(agents_with_urls) > 0 and agent_errors == len(agents_with_urls)
+            if all_configured_failed:
+                run.status = "failed"
+                await _add_log(db, run_id, "All agent API calls failed — marking run as failed", "error", _elapsed())
+            else:
+                run.status = "completed"
+                await _add_log(db, run_id, "Report generated successfully", "success", _elapsed())
+                await _add_log(db, run_id, "Workflow execution completed", "success", _elapsed())
+
             await db.commit()
+
+            # ── Save report as assistant chat message ──
+            if chat_session_id and chat_user_id:
+                try:
+                    from app.models.chat import ChatMessage, ChatSession
+                    msg = ChatMessage(
+                        session_id=chat_session_id,
+                        role="assistant",
+                        content=report,
+                        message_type="report" if not all_configured_failed else "error",
+                        workflow_id=workflow_id,
+                        run_id=run_id,
+                        workflow_title=workflow.title,
+                    )
+                    db.add(msg)
+                    # Touch session updated_at
+                    sess_q = await db.execute(
+                        select(ChatSession).where(ChatSession.id == chat_session_id)
+                    )
+                    sess = sess_q.scalar_one_or_none()
+                    if sess:
+                        sess.updated_at = datetime.now(timezone.utc)
+                    await db.commit()
+                except Exception as chat_err:
+                    print(f"[RUN {run_id}] Failed to save chat message: {chat_err}")
 
         except Exception as e:
             import traceback
