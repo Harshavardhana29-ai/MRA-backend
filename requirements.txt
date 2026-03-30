@@ -19,6 +19,9 @@ httpx==0.28.1
 apscheduler==3.11.2
 croniter==6.2.2
 
+# Auth
+PyJWT==2.9.0
+
 # Utilities
 python-dateutil==2.9.0
 tzdata==2025.2

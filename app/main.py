@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
-from app.api import data_sources, workflows, agents, runs, scheduled_jobs
+from app.api import auth, data_sources, workflows, agents, runs, scheduled_jobs
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-5s %(name)s — %(message)s")
 
@@ -34,6 +34,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(data_sources.router, prefix="/api/data-sources", tags=["Data Sources"])
 app.include_router(workflows.router, prefix="/api/workflows", tags=["Workflows"])
 app.include_router(agents.router, prefix="/api/agents", tags=["Agents"])
