@@ -54,8 +54,11 @@ def _workflow_query():
     )
 
 
-async def create_workflow(db: AsyncSession, data: WorkflowCreate) -> WorkflowResponse:
+async def create_workflow(
+    db: AsyncSession, data: WorkflowCreate, user_id: UUID | None = None,
+) -> WorkflowResponse:
     workflow = Workflow(
+        user_id=user_id,
         title=data.title,
         topic=data.topic,
         status=data.status,
@@ -79,6 +82,7 @@ async def create_workflow(db: AsyncSession, data: WorkflowCreate) -> WorkflowRes
 
     # Log activity
     log = ActivityLog(
+        user_id=user_id,
         action="Added",
         entity_type="workflow",
         entity_name=data.title,
@@ -92,10 +96,13 @@ async def create_workflow(db: AsyncSession, data: WorkflowCreate) -> WorkflowRes
     return _build_workflow_response(workflow)
 
 
-async def get_workflow(db: AsyncSession, workflow_id: UUID) -> WorkflowResponse | None:
-    result = await db.execute(
-        _workflow_query().where(Workflow.id == workflow_id)
-    )
+async def get_workflow(
+    db: AsyncSession, workflow_id: UUID, user_id: UUID | None = None,
+) -> WorkflowResponse | None:
+    query = _workflow_query().where(Workflow.id == workflow_id)
+    if user_id:
+        query = query.where(Workflow.user_id == user_id)
+    result = await db.execute(query)
     workflow = result.scalar_one_or_none()
     if not workflow:
         return None
@@ -105,8 +112,11 @@ async def get_workflow(db: AsyncSession, workflow_id: UUID) -> WorkflowResponse 
 async def list_workflows(
     db: AsyncSession,
     topic: str | None = None,
+    user_id: UUID | None = None,
 ) -> WorkflowListResponse:
     query = _workflow_query()
+    if user_id:
+        query = query.where(Workflow.user_id == user_id)
 
     if topic and topic.lower() != "all":
         query = query.where(Workflow.topic == topic)
@@ -120,14 +130,15 @@ async def list_workflows(
 
 
 async def update_workflow(
-    db: AsyncSession, workflow_id: UUID, data: WorkflowUpdate
+    db: AsyncSession, workflow_id: UUID, data: WorkflowUpdate, user_id: UUID | None = None,
 ) -> WorkflowResponse | None:
-    result = await db.execute(
-        select(Workflow).where(
-            Workflow.id == workflow_id,
-            Workflow.deleted_at.is_(None),
-        )
+    query = select(Workflow).where(
+        Workflow.id == workflow_id,
+        Workflow.deleted_at.is_(None),
     )
+    if user_id:
+        query = query.where(Workflow.user_id == user_id)
+    result = await db.execute(query)
     workflow = result.scalar_one_or_none()
     if not workflow:
         return None
@@ -163,6 +174,7 @@ async def update_workflow(
 
     # Log activity
     log = ActivityLog(
+        user_id=user_id,
         action="Updated",
         entity_type="workflow",
         entity_name=workflow.title,
@@ -176,13 +188,16 @@ async def update_workflow(
     return _build_workflow_response(workflow)
 
 
-async def delete_workflow(db: AsyncSession, workflow_id: UUID) -> bool:
-    result = await db.execute(
-        select(Workflow).where(
-            Workflow.id == workflow_id,
-            Workflow.deleted_at.is_(None),
-        )
+async def delete_workflow(
+    db: AsyncSession, workflow_id: UUID, user_id: UUID | None = None,
+) -> bool:
+    query = select(Workflow).where(
+        Workflow.id == workflow_id,
+        Workflow.deleted_at.is_(None),
     )
+    if user_id:
+        query = query.where(Workflow.user_id == user_id)
+    result = await db.execute(query)
     workflow = result.scalar_one_or_none()
     if not workflow:
         return False
@@ -191,6 +206,7 @@ async def delete_workflow(db: AsyncSession, workflow_id: UUID) -> bool:
     await db.flush()
 
     log = ActivityLog(
+        user_id=user_id,
         action="Removed",
         entity_type="workflow",
         entity_name=workflow.title,
@@ -201,9 +217,11 @@ async def delete_workflow(db: AsyncSession, workflow_id: UUID) -> bool:
     return True
 
 
-async def get_stats(db: AsyncSession) -> WorkflowStats:
+async def get_stats(db: AsyncSession, user_id: UUID | None = None) -> WorkflowStats:
     # Total active workflows
     total_q = select(func.count()).where(Workflow.deleted_at.is_(None))
+    if user_id:
+        total_q = total_q.where(Workflow.user_id == user_id)
     total = (await db.execute(total_q)).scalar() or 0
 
     # Count distinct agents used across all active workflows
@@ -213,6 +231,8 @@ async def get_stats(db: AsyncSession) -> WorkflowStats:
         .join(Workflow, WorkflowAgent.workflow_id == Workflow.id)
         .where(Workflow.deleted_at.is_(None))
     )
+    if user_id:
+        agents_q = agents_q.where(Workflow.user_id == user_id)
     agents_used = (await db.execute(agents_q)).scalar() or 0
 
     return WorkflowStats(total=total, agents_used=agents_used)

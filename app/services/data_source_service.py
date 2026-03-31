@@ -49,8 +49,11 @@ def _action_color(action: str) -> str:
     return colors.get(action, "bg-bosch-blue")
 
 
-async def create_data_source(db: AsyncSession, data: DataSourceCreate) -> DataSource:
+async def create_data_source(
+    db: AsyncSession, data: DataSourceCreate, user_id: UUID | None = None,
+) -> DataSource:
     source = DataSource(
+        user_id=user_id,
         url=data.url,
         title=data.title,
         description=data.description,
@@ -63,6 +66,7 @@ async def create_data_source(db: AsyncSession, data: DataSourceCreate) -> DataSo
 
     # Log activity
     log = ActivityLog(
+        user_id=user_id,
         action="Added",
         entity_type="data_source",
         entity_name=data.title,
@@ -73,13 +77,16 @@ async def create_data_source(db: AsyncSession, data: DataSourceCreate) -> DataSo
     return source
 
 
-async def get_data_source(db: AsyncSession, source_id: UUID) -> DataSource | None:
-    result = await db.execute(
-        select(DataSource).where(
-            DataSource.id == source_id,
-            DataSource.deleted_at.is_(None),
-        )
+async def get_data_source(
+    db: AsyncSession, source_id: UUID, user_id: UUID | None = None,
+) -> DataSource | None:
+    query = select(DataSource).where(
+        DataSource.id == source_id,
+        DataSource.deleted_at.is_(None),
     )
+    if user_id:
+        query = query.where(DataSource.user_id == user_id)
+    result = await db.execute(query)
     return result.scalar_one_or_none()
 
 
@@ -89,8 +96,11 @@ async def list_data_sources(
     topic: str | None = None,
     page: int = 1,
     page_size: int = 50,
+    user_id: UUID | None = None,
 ) -> DataSourceListResponse:
     query = select(DataSource).where(DataSource.deleted_at.is_(None))
+    if user_id:
+        query = query.where(DataSource.user_id == user_id)
 
     if search:
         query = query.where(DataSource.title.ilike(f"%{search}%"))
@@ -120,9 +130,9 @@ async def list_data_sources(
 
 
 async def update_data_source(
-    db: AsyncSession, source_id: UUID, data: DataSourceUpdate
+    db: AsyncSession, source_id: UUID, data: DataSourceUpdate, user_id: UUID | None = None,
 ) -> DataSource | None:
-    source = await get_data_source(db, source_id)
+    source = await get_data_source(db, source_id, user_id=user_id)
     if not source:
         return None
 
@@ -135,6 +145,7 @@ async def update_data_source(
 
     # Log activity
     log = ActivityLog(
+        user_id=user_id,
         action="Updated",
         entity_type="data_source",
         entity_name=source.title,
@@ -145,8 +156,10 @@ async def update_data_source(
     return source
 
 
-async def delete_data_source(db: AsyncSession, source_id: UUID) -> bool:
-    source = await get_data_source(db, source_id)
+async def delete_data_source(
+    db: AsyncSession, source_id: UUID, user_id: UUID | None = None,
+) -> bool:
+    source = await get_data_source(db, source_id, user_id=user_id)
     if not source:
         return False
 
@@ -155,6 +168,7 @@ async def delete_data_source(db: AsyncSession, source_id: UUID) -> bool:
 
     # Log activity
     log = ActivityLog(
+        user_id=user_id,
         action="Removed",
         entity_type="data_source",
         entity_name=source.title,
@@ -165,24 +179,30 @@ async def delete_data_source(db: AsyncSession, source_id: UUID) -> bool:
     return True
 
 
-async def get_stats(db: AsyncSession) -> DataSourceStats:
+async def get_stats(db: AsyncSession, user_id: UUID | None = None) -> DataSourceStats:
     base = select(DataSource).where(DataSource.deleted_at.is_(None))
+    if user_id:
+        base = base.where(DataSource.user_id == user_id)
 
     total_q = select(func.count()).select_from(base.subquery())
     total = (await db.execute(total_q)).scalar() or 0
 
-    topic_q = select(func.count(distinct(DataSource.topic))).where(DataSource.deleted_at.is_(None))
-    topic_count = (await db.execute(topic_q)).scalar() or 0
+    topic_base = select(distinct(DataSource.topic)).where(DataSource.deleted_at.is_(None))
+    if user_id:
+        topic_base = topic_base.where(DataSource.user_id == user_id)
+    topic_count = (await db.execute(select(func.count()).select_from(topic_base.subquery()))).scalar() or 0
 
     return DataSourceStats(total_sources=total, topic_count=topic_count)
 
 
-async def get_activity_log(db: AsyncSession, limit: int = 10) -> list[ActivityLogResponse]:
-    result = await db.execute(
-        select(ActivityLog)
-        .order_by(ActivityLog.timestamp.desc())
-        .limit(limit)
-    )
+async def get_activity_log(
+    db: AsyncSession, limit: int = 10, user_id: UUID | None = None,
+) -> list[ActivityLogResponse]:
+    query = select(ActivityLog)
+    if user_id:
+        query = query.where(ActivityLog.user_id == user_id)
+    query = query.order_by(ActivityLog.timestamp.desc()).limit(limit)
+    result = await db.execute(query)
     logs = result.scalars().all()
 
     return [
@@ -196,23 +216,23 @@ async def get_activity_log(db: AsyncSession, limit: int = 10) -> list[ActivityLo
     ]
 
 
-async def get_topics(db: AsyncSession) -> list[str]:
-    result = await db.execute(
-        select(distinct(DataSource.topic)).where(DataSource.deleted_at.is_(None))
-    )
+async def get_topics(db: AsyncSession, user_id: UUID | None = None) -> list[str]:
+    query = select(distinct(DataSource.topic)).where(DataSource.deleted_at.is_(None))
+    if user_id:
+        query = query.where(DataSource.user_id == user_id)
+    result = await db.execute(query)
     db_topics = [row[0] for row in result.all()]
     all_topics = list(set(PREDEFINED_TOPICS + db_topics))
     all_topics.sort()
     return all_topics
 
 
-async def get_tags(db: AsyncSession) -> list[str]:
+async def get_tags(db: AsyncSession, user_id: UUID | None = None) -> list[str]:
     # Get all unique tags from data sources (tags is ARRAY column)
-    result = await db.execute(
-        select(func.unnest(DataSource.tags).label("tag"))
-        .where(DataSource.deleted_at.is_(None))
-        .distinct()
-    )
+    query = select(func.unnest(DataSource.tags).label("tag")).where(DataSource.deleted_at.is_(None))
+    if user_id:
+        query = query.where(DataSource.user_id == user_id)
+    result = await db.execute(query.distinct())
     db_tags = [row[0] for row in result.all()]
     all_tags = list(set(PREDEFINED_TAGS + db_tags))
     all_tags.sort()

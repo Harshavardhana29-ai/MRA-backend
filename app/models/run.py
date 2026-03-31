@@ -16,6 +16,7 @@ class WorkflowRun(Base):
         ForeignKey("workflows.id", ondelete="CASCADE"),
         nullable=False,
     )
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     user_prompt = Column(Text, nullable=True)
     status = Column(String(20), nullable=False, default="idle")  # idle, running, completed, failed
     progress = Column(Float, nullable=False, default=0.0)
@@ -31,6 +32,7 @@ class WorkflowRun(Base):
     __table_args__ = (
         Index("idx_run_workflow_id", "workflow_id"),
         Index("idx_run_status", "status"),
+        Index("idx_run_user_id", "user_id"),
     )
 
 

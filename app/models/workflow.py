@@ -11,6 +11,7 @@ class Workflow(Base):
     __tablename__ = "workflows"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     title = Column(String(500), nullable=False)
     topic = Column(String(100), nullable=False, index=True)
     status = Column(String(20), nullable=False, default="Draft")  # Active, Draft
@@ -21,6 +22,7 @@ class Workflow(Base):
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
+    user = relationship("User", foreign_keys=[user_id], lazy="raise")
     data_source_associations = relationship(
         "WorkflowDataSource", back_populates="workflow", cascade="all, delete-orphan"
     )
@@ -33,6 +35,7 @@ class Workflow(Base):
         Index("idx_workflow_topic", "topic"),
         Index("idx_workflow_status", "status"),
         Index("idx_workflow_deleted_at", "deleted_at"),
+        Index("idx_workflow_user_id", "user_id"),
     )
 
 

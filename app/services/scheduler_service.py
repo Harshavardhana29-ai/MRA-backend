@@ -234,7 +234,9 @@ def _to_response(job: ScheduledJob, wf_title: str = "—") -> ScheduledJobRespon
 
 # ─── CRUD ────────────────────────────────────────────────────
 
-async def create_job(db: AsyncSession, data: ScheduledJobCreate) -> ScheduledJobResponse:
+async def create_job(
+    db: AsyncSession, data: ScheduledJobCreate, user_id: UUID | None = None,
+) -> ScheduledJobResponse:
     wf = await db.execute(
         select(Workflow).where(Workflow.id == data.workflow_id, Workflow.deleted_at.is_(None))
     )
@@ -251,6 +253,7 @@ async def create_job(db: AsyncSession, data: ScheduledJobCreate) -> ScheduledJob
             one_time_dt = one_time_dt.replace(tzinfo=user_tz)
 
     job = ScheduledJob(
+        user_id=user_id,
         job_name=data.name,
         workflow_id=data.workflow_id,
         user_prompt=data.user_prompt,
@@ -287,8 +290,13 @@ async def create_job(db: AsyncSession, data: ScheduledJobCreate) -> ScheduledJob
     return _to_response(job, workflow.title)
 
 
-async def update_job(db: AsyncSession, job_id: UUID, data: ScheduledJobUpdate) -> ScheduledJobResponse:
-    result = await db.execute(select(ScheduledJob).where(ScheduledJob.id == job_id))
+async def update_job(
+    db: AsyncSession, job_id: UUID, data: ScheduledJobUpdate, user_id: UUID | None = None,
+) -> ScheduledJobResponse:
+    query = select(ScheduledJob).where(ScheduledJob.id == job_id)
+    if user_id:
+        query = query.where(ScheduledJob.user_id == user_id)
+    result = await db.execute(query)
     job = result.scalar_one_or_none()
     if not job:
         raise ValueError("Scheduled job not found")
@@ -346,8 +354,11 @@ async def update_job(db: AsyncSession, job_id: UUID, data: ScheduledJobUpdate) -
     return _to_response(job, workflow.title)
 
 
-async def delete_job(db: AsyncSession, job_id: UUID):
-    result = await db.execute(select(ScheduledJob).where(ScheduledJob.id == job_id))
+async def delete_job(db: AsyncSession, job_id: UUID, user_id: UUID | None = None):
+    query = select(ScheduledJob).where(ScheduledJob.id == job_id)
+    if user_id:
+        query = query.where(ScheduledJob.user_id == user_id)
+    result = await db.execute(query)
     job = result.scalar_one_or_none()
     if not job:
         raise ValueError("Scheduled job not found")
@@ -357,11 +368,16 @@ async def delete_job(db: AsyncSession, job_id: UUID):
     await db.commit()
 
 
-async def toggle_job(db: AsyncSession, job_id: UUID) -> ScheduledJobResponse:
-    result = await db.execute(
+async def toggle_job(
+    db: AsyncSession, job_id: UUID, user_id: UUID | None = None,
+) -> ScheduledJobResponse:
+    query = (
         select(ScheduledJob).options(selectinload(ScheduledJob.workflow))
         .where(ScheduledJob.id == job_id)
     )
+    if user_id:
+        query = query.where(ScheduledJob.user_id == user_id)
+    result = await db.execute(query)
     job = result.scalar_one_or_none()
     if not job:
         raise ValueError("Scheduled job not found")
@@ -385,12 +401,16 @@ async def toggle_job(db: AsyncSession, job_id: UUID) -> ScheduledJobResponse:
     return _to_response(job, wf_title)
 
 
-async def list_jobs(db: AsyncSession, status_filter: str | None = None) -> list[ScheduledJobResponse]:
+async def list_jobs(
+    db: AsyncSession, status_filter: str | None = None, user_id: UUID | None = None,
+) -> list[ScheduledJobResponse]:
     query = (
         select(ScheduledJob)
         .options(selectinload(ScheduledJob.workflow))
         .order_by(ScheduledJob.created_at.desc())
     )
+    if user_id:
+        query = query.where(ScheduledJob.user_id == user_id)
     if status_filter and status_filter != "all":
         query = query.where(ScheduledJob.status == status_filter)
 
@@ -403,22 +423,29 @@ async def list_jobs(db: AsyncSession, status_filter: str | None = None) -> list[
     ]
 
 
-async def get_job(db: AsyncSession, job_id: UUID) -> ScheduledJobResponse:
-    result = await db.execute(
+async def get_job(
+    db: AsyncSession, job_id: UUID, user_id: UUID | None = None,
+) -> ScheduledJobResponse:
+    query = (
         select(ScheduledJob).options(selectinload(ScheduledJob.workflow))
         .where(ScheduledJob.id == job_id)
     )
+    if user_id:
+        query = query.where(ScheduledJob.user_id == user_id)
+    result = await db.execute(query)
     job = result.scalar_one_or_none()
     if not job:
         raise ValueError("Scheduled job not found")
     return _to_response(job, job.workflow.title if job.workflow else "—")
 
 
-async def get_counts(db: AsyncSession) -> JobCountsResponse:
-    rows = await db.execute(
-        select(ScheduledJob.status, sa_func.count())
-        .group_by(ScheduledJob.status)
-    )
+async def get_counts(
+    db: AsyncSession, user_id: UUID | None = None,
+) -> JobCountsResponse:
+    query = select(ScheduledJob.status, sa_func.count()).group_by(ScheduledJob.status)
+    if user_id:
+        query = query.where(ScheduledJob.user_id == user_id)
+    rows = await db.execute(query)
     mapping = {row[0]: row[1] for row in rows}
     return JobCountsResponse(
         active=mapping.get("active", 0),
@@ -428,10 +455,25 @@ async def get_counts(db: AsyncSession) -> JobCountsResponse:
     )
 
 
-async def get_job_history(db: AsyncSession, job_id: UUID) -> list[JobHistoryResponse]:
-    result = await db.execute(
+async def get_job_history(
+    db: AsyncSession, job_id: UUID, user_id: UUID | None = None,
+) -> list[JobHistoryResponse]:
+    query = (
         select(ScheduledJobRun)
         .where(ScheduledJobRun.scheduled_job_id == job_id)
+    )
+    # Verify job belongs to user
+    if user_id:
+        job_q = await db.execute(
+            select(ScheduledJob.id).where(
+                ScheduledJob.id == job_id,
+                ScheduledJob.user_id == user_id,
+            )
+        )
+        if not job_q.scalar_one_or_none():
+            return []
+    result = await db.execute(
+        query
         .options(
             selectinload(ScheduledJobRun.workflow_run)
             .selectinload(WorkflowRun.workflow)
@@ -489,15 +531,22 @@ async def get_job_history(db: AsyncSession, job_id: UUID) -> list[JobHistoryResp
     return entries
 
 
-async def get_recent_runs(db: AsyncSession, hours: int = 24) -> list:
+async def get_recent_runs(
+    db: AsyncSession, hours: int = 24, user_id: UUID | None = None,
+) -> list:
     from datetime import timedelta
     from app.schemas.scheduled_job import RecentRunResponse
 
     cutoff = datetime.now(tz.utc) - timedelta(hours=hours)
-    result = await db.execute(
+    query = (
         select(ScheduledJobRun)
         .join(ScheduledJob, ScheduledJobRun.scheduled_job_id == ScheduledJob.id)
         .where(ScheduledJobRun.started_at >= cutoff)
+    )
+    if user_id:
+        query = query.where(ScheduledJob.user_id == user_id)
+    result = await db.execute(
+        query
         .options(
             selectinload(ScheduledJobRun.scheduled_job),
             selectinload(ScheduledJobRun.workflow_run)
@@ -550,6 +599,7 @@ async def _run_scheduled_job(job_id: UUID):
         await db.commit()
 
     job_workflow_id = job.workflow_id
+    job_user_id = job.user_id
     job_user_prompt = job.user_prompt or ""
     job_name = job.job_name
     job_retry_enabled = job.retry_enabled
@@ -582,6 +632,7 @@ async def _run_scheduled_job(job_id: UUID):
 
                 wf_run = WorkflowRun(
                     workflow_id=job_workflow_id,
+                    user_id=job_user_id,
                     user_prompt=job_user_prompt or f"Scheduled: {job_name}",
                     status="running",
                     progress=0.0,

@@ -11,6 +11,7 @@ class ScheduledJob(Base):
     __tablename__ = "scheduled_jobs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     job_name = Column(String(500), nullable=False)
     workflow_id = Column(
         UUID(as_uuid=True),
@@ -52,6 +53,7 @@ class ScheduledJob(Base):
         Index("idx_sj_status", "status"),
         Index("idx_sj_enabled", "enabled"),
         Index("idx_sj_next_run", "next_run_at"),
+        Index("idx_sj_user_id", "user_id"),
     )
 
 

@@ -34,6 +34,7 @@ async def start_run(
 
     run = WorkflowRun(
         workflow_id=workflow_id,
+        user_id=chat_user.id if chat_user else None,
         user_prompt=user_prompt,
         status="running",
         progress=0.0,
@@ -270,12 +271,15 @@ async def _execute_run(
                 print(f"[RUN {run_id}] Error while marking run as failed: {inner_e}")
 
 
-async def get_run(db: AsyncSession, run_id: UUID) -> WorkflowRunResponse | None:
-    result = await db.execute(
+async def get_run(db: AsyncSession, run_id: UUID, user_id: UUID | None = None) -> WorkflowRunResponse | None:
+    query = (
         select(WorkflowRun)
         .where(WorkflowRun.id == run_id)
         .options(selectinload(WorkflowRun.logs))
     )
+    if user_id:
+        query = query.where(WorkflowRun.user_id == user_id)
+    result = await db.execute(query)
     run = result.scalar_one_or_none()
     if not run:
         return None
@@ -297,10 +301,11 @@ async def get_run(db: AsyncSession, run_id: UUID) -> WorkflowRunResponse | None:
     )
 
 
-async def get_run_status(db: AsyncSession, run_id: UUID) -> RunStatusResponse | None:
-    result = await db.execute(
-        select(WorkflowRun).where(WorkflowRun.id == run_id)
-    )
+async def get_run_status(db: AsyncSession, run_id: UUID, user_id: UUID | None = None) -> RunStatusResponse | None:
+    query = select(WorkflowRun).where(WorkflowRun.id == run_id)
+    if user_id:
+        query = query.where(WorkflowRun.user_id == user_id)
+    result = await db.execute(query)
     run = result.scalar_one_or_none()
     if not run:
         return None
@@ -322,7 +327,17 @@ async def get_run_status(db: AsyncSession, run_id: UUID) -> RunStatusResponse | 
     )
 
 
-async def get_run_logs(db: AsyncSession, run_id: UUID) -> list[RunLogResponse]:
+async def get_run_logs(db: AsyncSession, run_id: UUID, user_id: UUID | None = None) -> list[RunLogResponse]:
+    # Verify the run belongs to user first
+    if user_id:
+        run_q = await db.execute(
+            select(WorkflowRun.id).where(
+                WorkflowRun.id == run_id,
+                WorkflowRun.user_id == user_id,
+            )
+        )
+        if not run_q.scalar_one_or_none():
+            return []
     result = await db.execute(
         select(RunLog)
         .where(RunLog.run_id == run_id)
@@ -335,9 +350,10 @@ async def get_run_logs(db: AsyncSession, run_id: UUID) -> list[RunLogResponse]:
     ]
 
 
-async def get_run_report(db: AsyncSession, run_id: UUID) -> str | None:
-    result = await db.execute(
-        select(WorkflowRun.report_markdown).where(WorkflowRun.id == run_id)
-    )
+async def get_run_report(db: AsyncSession, run_id: UUID, user_id: UUID | None = None) -> str | None:
+    query = select(WorkflowRun.report_markdown).where(WorkflowRun.id == run_id)
+    if user_id:
+        query = query.where(WorkflowRun.user_id == user_id)
+    result = await db.execute(query)
     row = result.scalar_one_or_none()
     return row
