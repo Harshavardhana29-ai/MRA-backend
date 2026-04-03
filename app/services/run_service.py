@@ -158,6 +158,22 @@ async def _execute_run(
                                 "present a single, unified report that combines the "
                                 "results from all concurrent processes without splitting "
                                 "the output."
+                                "\n\nIMPORTANT: Return your response as a JSON object with the following structure:"
+                                '\n{"sections": ['
+                                '\n  {"type": "text", "title": "Section Title", "content": "Your analysis text here. Use markdown formatting for bold, lists, etc."},'
+                                '\n  {"type": "chart", "title": "Chart Title", "chartType": "bar", "data": [{"label": "Item1", "value": 10}, {"label": "Item2", "value": 20}], "keys": ["value"], "nameKey": "label"},'
+                                '\n  {"type": "table", "title": "Table Title", "headers": ["Column1", "Column2"], "rows": [["val1", "val2"], ["val3", "val4"]]},'
+                                '\n  {"type": "text", "title": "Another Section", "content": "More text..."}'
+                                "\n]}"
+                                "\n\nRules for the JSON response:"
+                                "\n- The root object MUST have a 'sections' array."
+                                "\n- Each section has a 'type' field: 'text', 'chart', or 'table'."
+                                "\n- For 'text' sections: include 'title' (string) and 'content' (string, supports markdown)."
+                                "\n- For 'chart' sections: include 'title' (string), 'chartType' ('bar', 'line', or 'pie'), "
+                                "'data' (array of objects), 'keys' (array of value field names), 'nameKey' (label field name)."
+                                "\n- For 'table' sections: include 'title' (string), 'headers' (array of strings), "
+                                "'rows' (array of arrays of strings/numbers)."
+                                "\n- Return ONLY valid JSON — no markdown fences, no extra text before or after the JSON."
                             )
 
                             response = await client.post(
