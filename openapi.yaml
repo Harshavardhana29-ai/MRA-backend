@@ -1,7 +1,7 @@
 swagger: "2.0"
 info:
   title: mra-backend-api
-  version: "1.1"
+  version: "1.2"
 schemes:
   - https
 x-google-backend:
@@ -619,6 +619,177 @@ paths:
           name: body
           schema:
             type: object
+      responses:
+        "201":
+          description: OK
+
+  /api/users:
+    options:
+      operationId: usersOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: usersGET
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: usersPOST
+      parameters:
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "201":
+          description: OK
+  /api/users/admins:
+    options:
+      operationId: usersAdminsOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: usersAdminsGET
+      responses:
+        "200":
+          description: OK
+  /api/users/my-assistants:
+    options:
+      operationId: usersMyAssistOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: usersMyAssistGET
+      responses:
+        "200":
+          description: OK
+  /api/users/assistants:
+    options:
+      operationId: usersAssistOPT
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: usersAssistPOST
+      parameters:
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "201":
+          description: OK
+  /api/users/{user_id}:
+    options:
+      operationId: usersIdOPT
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: usersIdGET
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    put:
+      operationId: usersIdPUT
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          type: string
+        - in: body
+          name: body
+          schema:
+            type: object
+      responses:
+        "200":
+          description: OK
+    delete:
+      operationId: usersIdDEL
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          type: string
+      responses:
+        "204":
+          description: OK
+
+  /api/data-sources/public/list:
+    options:
+      operationId: dsPubListOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: dsPubListGET
+      responses:
+        "200":
+          description: OK
+  /api/data-sources/public/{source_id}/sync:
+    options:
+      operationId: dsPubSyncOPT
+      parameters:
+        - in: path
+          name: source_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: dsPubSyncPOST
+      parameters:
+        - in: path
+          name: source_id
+          required: true
+          type: string
+      responses:
+        "201":
+          description: OK
+
+  /api/workflows/public/list:
+    options:
+      operationId: wfPubListOPT
+      responses:
+        "200":
+          description: OK
+    get:
+      operationId: wfPubListGET
+      responses:
+        "200":
+          description: OK
+  /api/workflows/public/{workflow_id}/sync:
+    options:
+      operationId: wfPubSyncOPT
+      parameters:
+        - in: path
+          name: workflow_id
+          required: true
+          type: string
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: wfPubSyncPOST
+      parameters:
+        - in: path
+          name: workflow_id
+          required: true
+          type: string
       responses:
         "201":
           description: OK
