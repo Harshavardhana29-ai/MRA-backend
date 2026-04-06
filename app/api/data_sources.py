@@ -2,7 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.middleware.auth import get_current_user, require_admin_or_above
+from app.middleware.auth import get_current_user, require_admin_or_above, get_effective_user_id
 from app.models.user import User
 from app.schemas.data_source import (
     DataSourceCreate, DataSourceUpdate, DataSourceResponse,
@@ -18,7 +18,7 @@ async def get_stats(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return await service.get_stats(db, user_id=user.id)
+    return await service.get_stats(db, user_id=get_effective_user_id(user))
 
 
 @router.get("/activity", response_model=list[ActivityLogResponse])
@@ -27,7 +27,7 @@ async def get_activity(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return await service.get_activity_log(db, limit=limit, user_id=user.id)
+    return await service.get_activity_log(db, limit=limit, user_id=get_effective_user_id(user))
 
 
 @router.get("/topics", response_model=list[str])
@@ -35,7 +35,7 @@ async def get_topics(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return await service.get_topics(db, user_id=user.id)
+    return await service.get_topics(db, user_id=get_effective_user_id(user))
 
 
 @router.get("/tags", response_model=list[str])
@@ -43,7 +43,7 @@ async def get_tags(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return await service.get_tags(db, user_id=user.id)
+    return await service.get_tags(db, user_id=get_effective_user_id(user))
 
 
 @router.get("", response_model=DataSourceListResponse)
@@ -56,7 +56,8 @@ async def list_data_sources(
     user: User = Depends(get_current_user),
 ):
     return await service.list_data_sources(
-        db, search=search, topic=topic, page=page, page_size=page_size, user_id=user.id,
+        db, search=search, topic=topic, page=page, page_size=page_size,
+        user_id=get_effective_user_id(user),
     )
 
 
@@ -66,7 +67,7 @@ async def get_data_source(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    source = await service.get_data_source(db, source_id, user_id=user.id)
+    source = await service.get_data_source(db, source_id, user_id=get_effective_user_id(user))
     if not source:
         raise HTTPException(status_code=404, detail="Data source not found")
     return DataSourceResponse.model_validate(source)
@@ -78,7 +79,7 @@ async def create_data_source(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    source = await service.create_data_source(db, data, user_id=user.id)
+    source = await service.create_data_source(db, data, user_id=get_effective_user_id(user))
     return DataSourceResponse.model_validate(source)
 
 
@@ -89,7 +90,7 @@ async def update_data_source(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    source = await service.update_data_source(db, source_id, data, user_id=user.id)
+    source = await service.update_data_source(db, source_id, data, user_id=get_effective_user_id(user))
     if not source:
         raise HTTPException(status_code=404, detail="Data source not found")
     return DataSourceResponse.model_validate(source)
@@ -101,7 +102,7 @@ async def delete_data_source(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    deleted = await service.delete_data_source(db, source_id, user_id=user.id)
+    deleted = await service.delete_data_source(db, source_id, user_id=get_effective_user_id(user))
     if not deleted:
         raise HTTPException(status_code=404, detail="Data source not found")
 
@@ -113,7 +114,7 @@ async def list_public_data_sources(
     search: str | None = Query(default=None),
     topic: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_admin_or_above),
+    user: User = Depends(get_current_user),
 ):
     return await service.list_public_data_sources(db, search=search, topic=topic)
 
@@ -122,10 +123,12 @@ async def list_public_data_sources(
 async def sync_public_data_source(
     source_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_admin_or_above),
+    user: User = Depends(get_current_user),
 ):
     try:
-        source = await service.sync_public_data_source(db, source_id, user_id=user.id)
+        source = await service.sync_public_data_source(db, source_id, user_id=get_effective_user_id(user))
         return DataSourceResponse.model_validate(source)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        detail = str(e)
+        code = 409 if "already been synced" in detail else 404
+        raise HTTPException(status_code=code, detail=detail)

@@ -112,3 +112,15 @@ async def require_admin_or_above(
             detail="Admin access required",
         )
     return user
+
+
+from uuid import UUID as _UUID
+
+def get_effective_user_id(user: User) -> _UUID:
+    """
+    Assistants operate on their admin's data.
+    Admins and super_admins operate on their own data.
+    """
+    if user.role == User.ROLE_ASSISTANT and user.admin_id:
+        return user.admin_id
+    return user.id

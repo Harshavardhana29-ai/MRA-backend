@@ -286,6 +286,16 @@ async def sync_public_data_source(
     if not original:
         raise ValueError("Public data source not found")
 
+    existing = await db.execute(
+        select(DataSource).where(
+            DataSource.user_id == user_id,
+            DataSource.url == original.url,
+            DataSource.deleted_at.is_(None),
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise ValueError("This data source has already been synced")
+
     copy = DataSource(
         user_id=user_id,
         url=original.url,

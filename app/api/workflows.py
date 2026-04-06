@@ -2,7 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.middleware.auth import get_current_user, require_admin_or_above
+from app.middleware.auth import get_current_user, require_admin_or_above, get_effective_user_id
 from app.models.user import User
 from app.schemas.workflow import (
     WorkflowCreate, WorkflowUpdate, WorkflowResponse,
@@ -18,7 +18,7 @@ async def get_stats(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return await service.get_stats(db, user_id=user.id)
+    return await service.get_stats(db, user_id=get_effective_user_id(user))
 
 
 @router.get("", response_model=WorkflowListResponse)
@@ -31,7 +31,8 @@ async def list_workflows(
     user: User = Depends(get_current_user),
 ):
     return await service.list_workflows(
-        db, topic=topic, search=search, page=page, page_size=page_size, user_id=user.id,
+        db, topic=topic, search=search, page=page, page_size=page_size,
+        user_id=get_effective_user_id(user),
     )
 
 
@@ -41,7 +42,7 @@ async def get_workflow(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    workflow = await service.get_workflow(db, workflow_id, user_id=user.id)
+    workflow = await service.get_workflow(db, workflow_id, user_id=get_effective_user_id(user))
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return workflow
@@ -53,7 +54,7 @@ async def create_workflow(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return await service.create_workflow(db, data, user_id=user.id)
+    return await service.create_workflow(db, data, user_id=get_effective_user_id(user))
 
 
 @router.put("/{workflow_id}", response_model=WorkflowResponse)
@@ -63,7 +64,7 @@ async def update_workflow(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    workflow = await service.update_workflow(db, workflow_id, data, user_id=user.id)
+    workflow = await service.update_workflow(db, workflow_id, data, user_id=get_effective_user_id(user))
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return workflow
@@ -75,7 +76,7 @@ async def delete_workflow(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    deleted = await service.delete_workflow(db, workflow_id, user_id=user.id)
+    deleted = await service.delete_workflow(db, workflow_id, user_id=get_effective_user_id(user))
     if not deleted:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
@@ -86,7 +87,7 @@ async def delete_workflow(
 async def list_public_workflows(
     topic: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_admin_or_above),
+    user: User = Depends(get_current_user),
 ):
     return await service.list_public_workflows(db, topic=topic)
 
@@ -95,9 +96,11 @@ async def list_public_workflows(
 async def sync_public_workflow(
     workflow_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_admin_or_above),
+    user: User = Depends(get_current_user),
 ):
     try:
-        return await service.sync_public_workflow(db, workflow_id, user_id=user.id)
+        return await service.sync_public_workflow(db, workflow_id, user_id=get_effective_user_id(user))
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        detail = str(e)
+        code = 409 if "already been synced" in detail else 404
+        raise HTTPException(status_code=code, detail=detail)

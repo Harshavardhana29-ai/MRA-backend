@@ -282,6 +282,17 @@ async def sync_public_workflow(
     if not original:
         raise ValueError("Public workflow not found")
 
+    existing = await db.execute(
+        select(Workflow).where(
+            Workflow.user_id == user_id,
+            Workflow.title == original.title,
+            Workflow.topic == original.topic,
+            Workflow.deleted_at.is_(None),
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise ValueError("This workflow has already been synced")
+
     copy = Workflow(
         user_id=user_id,
         title=original.title,
