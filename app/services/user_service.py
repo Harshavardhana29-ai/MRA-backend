@@ -31,6 +31,7 @@ async def list_users(
             or_(
                 User.display_name.ilike(term),
                 User.email.ilike(term),
+                User.ntid.ilike(term),
             )
         )
     if role and role != "all":
@@ -62,15 +63,19 @@ async def create_user(
     db: AsyncSession,
     data: UserCreateRequest,
 ) -> User:
-    """Create a new user (Super Admin operation)."""
-    existing = await db.execute(select(User).where(User.email == data.email))
-    if existing.scalar_one_or_none():
-        raise ValueError(f"User with email {data.email} already exists")
+    """Create a new user by NTID (Super Admin operation)."""
+    ntid_lower = data.ntid.lower().strip()
 
+    existing = await db.execute(select(User).where(User.ntid == ntid_lower))
+    if existing.scalar_one_or_none():
+        raise ValueError(f"User with NTID '{ntid_lower}' already exists")
+
+    placeholder_email = f"{ntid_lower}@bosch.com"
     user = User(
         id=uuid.uuid4(),
         sso_id=f"pending_{uuid.uuid4().hex[:12]}",
-        email=data.email,
+        ntid=ntid_lower,
+        email=placeholder_email,
         display_name=data.display_name,
         first_name=data.first_name,
         last_name=data.last_name,
@@ -80,7 +85,7 @@ async def create_user(
     )
     db.add(user)
     await db.flush()
-    logger.info("Created user %s (%s) with role %s", user.email, user.id, user.role)
+    logger.info("Created user ntid=%s (%s) with role %s", ntid_lower, user.id, user.role)
     return user
 
 

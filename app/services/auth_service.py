@@ -55,22 +55,34 @@ class AuthService:
     async def upsert_user(db: AsyncSession, sso_user: dict) -> User:
         """
         Create or update a user from MCP SSO profile data.
-        Maps MCP SSO fields: sub, email, name, ntid, givenName, surname, jobTitle, department
+        Maps MCP SSO fields: sub, email, name, ntid, givenName, surname, jobTitle, department.
+        If a user was pre-created by Super Admin (via ntid), links them on first SSO login.
         """
         sso_id = str(sso_user.get("sub") or sso_user.get("id") or sso_user.get("sso_id"))
         email = sso_user.get("email", "")
+        ntid = sso_user.get("ntid") or sso_user.get("nt_id") or ""
         display_name = sso_user.get("name") or sso_user.get("display_name") or email.split("@")[0]
         first_name = sso_user.get("givenName") or sso_user.get("given_name") or sso_user.get("first_name")
         last_name = sso_user.get("surname") or sso_user.get("family_name") or sso_user.get("last_name")
         avatar_url = sso_user.get("avatar_url") or sso_user.get("picture")
 
+        now = datetime.now(timezone.utc)
+
+        # First try to find by sso_id (returning user)
         stmt = select(User).where(User.sso_id == sso_id)
         result = await db.execute(stmt)
         user = result.scalar_one_or_none()
 
-        now = datetime.now(timezone.utc)
+        # If not found by sso_id, check if a user was pre-created with this ntid
+        if not user and ntid:
+            ntid_lower = ntid.lower().strip()
+            stmt = select(User).where(User.ntid == ntid_lower)
+            result = await db.execute(stmt)
+            user = result.scalar_one_or_none()
 
         if user:
+            user.sso_id = sso_id
+            user.ntid = ntid.lower().strip() if ntid else user.ntid
             user.email = email
             user.display_name = display_name
             user.first_name = first_name
@@ -82,6 +94,7 @@ class AuthService:
             user = User(
                 id=uuid.uuid4(),
                 sso_id=sso_id,
+                ntid=ntid.lower().strip() if ntid else None,
                 email=email,
                 display_name=display_name,
                 first_name=first_name,

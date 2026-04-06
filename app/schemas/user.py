@@ -7,6 +7,7 @@ from uuid import UUID
 class UserResponse(BaseModel):
     id: UUID
     sso_id: str
+    ntid: Optional[str] = None
     email: str
     display_name: str
     first_name: Optional[str] = None
@@ -42,7 +43,7 @@ class SessionInfo(BaseModel):
 # ─── User Management Schemas (Super Admin / Admin) ───────────
 
 class UserCreateRequest(BaseModel):
-    email: str = Field(..., min_length=1, max_length=320)
+    ntid: str = Field(..., min_length=1, max_length=50)
     display_name: str = Field(..., min_length=1, max_length=255)
     first_name: Optional[str] = None
     last_name: Optional[str] = None
