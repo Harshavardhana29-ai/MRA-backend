@@ -6,20 +6,25 @@ from app.middleware.auth import get_current_user
 from app.models.user import User
 from app.schemas.scheduled_job import (
     ScheduledJobCreate, ScheduledJobUpdate, ScheduledJobResponse,
-    JobHistoryResponse, JobCountsResponse, RecentRunResponse,
+    ScheduledJobListResponse, JobHistoryResponse, JobCountsResponse, RecentRunResponse,
 )
 from app.services import scheduler_service as service
 
 router = APIRouter()
 
 
-@router.get("/jobs", response_model=list[ScheduledJobResponse])
+@router.get("/jobs", response_model=ScheduledJobListResponse)
 async def list_jobs(
     status: str | None = Query(None),
+    search: str | None = Query(None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return await service.list_jobs(db, status, user_id=user.id)
+    return await service.list_jobs(
+        db, status_filter=status, search=search, page=page, page_size=page_size, user_id=user.id,
+    )
 
 
 @router.get("/jobs/counts", response_model=JobCountsResponse)

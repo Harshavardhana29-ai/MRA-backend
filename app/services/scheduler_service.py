@@ -402,25 +402,45 @@ async def toggle_job(
 
 
 async def list_jobs(
-    db: AsyncSession, status_filter: str | None = None, user_id: UUID | None = None,
-) -> list[ScheduledJobResponse]:
+    db: AsyncSession,
+    status_filter: str | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    user_id: UUID | None = None,
+):
+    from app.schemas.scheduled_job import ScheduledJobListResponse
+
+    base = select(ScheduledJob)
+    if user_id:
+        base = base.where(ScheduledJob.user_id == user_id)
+    if status_filter and status_filter != "all":
+        base = base.where(ScheduledJob.status == status_filter)
+    if search:
+        base = base.where(ScheduledJob.job_name.ilike(f"%{search}%"))
+
+    count_q = select(sa_func.count()).select_from(base.subquery())
+    total = (await db.execute(count_q)).scalar() or 0
+
     query = (
-        select(ScheduledJob)
+        base
         .options(selectinload(ScheduledJob.workflow))
         .order_by(ScheduledJob.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
-    if user_id:
-        query = query.where(ScheduledJob.user_id == user_id)
-    if status_filter and status_filter != "all":
-        query = query.where(ScheduledJob.status == status_filter)
 
     result = await db.execute(query)
     jobs = result.scalars().all()
 
-    return [
+    pages = max(1, (total + page_size - 1) // page_size)
+    items = [
         _to_response(j, j.workflow.title if j.workflow else "—")
         for j in jobs
     ]
+    return ScheduledJobListResponse(
+        items=items, total=total, page=page, page_size=page_size, pages=pages,
+    )
 
 
 async def get_job(

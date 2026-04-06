@@ -114,21 +114,36 @@ async def get_workflow(
 async def list_workflows(
     db: AsyncSession,
     topic: str | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
     user_id: UUID | None = None,
 ) -> WorkflowListResponse:
-    query = _workflow_query()
+    base = select(Workflow).where(Workflow.deleted_at.is_(None))
     if user_id:
-        query = query.where(Workflow.user_id == user_id)
-
+        base = base.where(Workflow.user_id == user_id)
     if topic and topic.lower() != "all":
-        query = query.where(Workflow.topic == topic)
+        base = base.where(Workflow.topic == topic)
+    if search:
+        base = base.where(Workflow.title.ilike(f"%{search}%"))
 
-    query = query.order_by(Workflow.created_at.desc())
+    count_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_q)).scalar() or 0
+
+    query = (
+        _workflow_query()
+        .where(Workflow.id.in_(base.with_only_columns(Workflow.id)))
+        .order_by(Workflow.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+
     result = await db.execute(query)
     workflows = result.scalars().unique().all()
 
+    pages = max(1, (total + page_size - 1) // page_size)
     items = [_build_workflow_response(w) for w in workflows]
-    return WorkflowListResponse(items=items, total=len(items))
+    return WorkflowListResponse(items=items, total=total, page=page, page_size=page_size, pages=pages)
 
 
 async def update_workflow(

@@ -66,6 +66,14 @@ class JobHistoryResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ScheduledJobListResponse(BaseModel):
+    items: list[ScheduledJobResponse]
+    total: int
+    page: int = 1
+    page_size: int = 50
+    pages: int = 1
+
+
 class JobCountsResponse(BaseModel):
     active: int = 0
     running: int = 0

@@ -24,10 +24,15 @@ async def get_stats(
 @router.get("", response_model=WorkflowListResponse)
 async def list_workflows(
     topic: str | None = Query(default=None),
+    search: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return await service.list_workflows(db, topic=topic, user_id=user.id)
+    return await service.list_workflows(
+        db, topic=topic, search=search, page=page, page_size=page_size, user_id=user.id,
+    )
 
 
 @router.get("/{workflow_id}", response_model=WorkflowResponse)

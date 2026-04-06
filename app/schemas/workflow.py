@@ -63,6 +63,9 @@ class WorkflowResponse(BaseModel):
 class WorkflowListResponse(BaseModel):
     items: list[WorkflowResponse]
     total: int
+    page: int = 1
+    page_size: int = 50
+    pages: int = 1
 
 
 class WorkflowStats(BaseModel):
