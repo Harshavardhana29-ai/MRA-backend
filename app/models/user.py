@@ -17,6 +17,7 @@ class User(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     sso_id = Column(String(255), unique=True, nullable=False, comment="Unique SSO identifier")
+    ntid = Column(String(50), unique=True, nullable=True, comment="Bosch NT-ID (e.g. ahc7kor)")
     email = Column(String(320), unique=True, nullable=False)
     display_name = Column(String(255), nullable=False)
     first_name = Column(String(100), nullable=True)
@@ -38,6 +39,7 @@ class User(Base):
     __table_args__ = (
         Index("idx_user_email", "email"),
         Index("idx_user_sso_id", "sso_id"),
+        Index("idx_user_ntid", "ntid"),
         Index("idx_user_admin_id", "admin_id"),
         Index("idx_user_role", "role"),
     )
