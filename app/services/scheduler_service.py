@@ -131,6 +131,9 @@ def _cron_to_type(cron: str) -> str:
     if len(parts) != 5:
         return "Custom"
     minute, hour, dom, _month, dow = parts
+    if minute.startswith("*/") and hour == "*":
+        interval = minute[2:]
+        return f"Every {interval} Min"
     if minute == "*" and hour == "*":
         return "Every Minute"
     if hour == "*":
@@ -154,6 +157,8 @@ def _cron_to_schedule_time(cron: str) -> str:
     minute, hour, dom, _month, dow = parts
     m = minute.zfill(2)
     h = hour.zfill(2)
+    if minute.startswith("*/") and hour == "*":
+        return f"Every {minute[2:]} min"
     if minute == "*" and hour == "*":
         return "* * * * *"
     if hour == "*":
@@ -195,7 +200,7 @@ def _format_relative(dt: datetime | None) -> str:
 def _to_response(job: ScheduledJob, wf_title: str = "—") -> ScheduledJobResponse:
     if job.schedule_type == "one-time":
         jtype = "One-time"
-        stime = job.one_time_date.strftime("%Y-%m-%d %H:%M") if job.one_time_date else "—"
+        stime = job.one_time_date.isoformat() if job.one_time_date else "—"
     else:
         jtype = _cron_to_type(job.cron_expression or "")
         stime = _cron_to_schedule_time(job.cron_expression or "")
@@ -207,8 +212,8 @@ def _to_response(job: ScheduledJob, wf_title: str = "—") -> ScheduledJobRespon
         workflow_id=job.workflow_id,
         workflow_title=wf_title,
         schedule_time=stime,
-        next_run=_format_relative(job.next_run_at),
-        last_run=_format_relative(job.last_run_at),
+        next_run=job.next_run_at,
+        last_run=job.last_run_at,
         status=job.status,
         enabled=job.enabled,
         jobs_done=job.jobs_done,
@@ -539,7 +544,7 @@ async def get_job_history(
 
         entries.append(JobHistoryResponse(
             id=run.id,
-            run_date=run.started_at.strftime("%Y-%m-%d %H:%M") if run.started_at else "—",
+            run_date=run.started_at,
             status="Completed" if run.status == "completed" else ("Failed" if run.status == "failed" else "Running"),
             duration=dur,
             workflow=workflow_title,
@@ -592,7 +597,7 @@ async def get_recent_runs(
         entries.append(RecentRunResponse(
             id=run.id,
             job_name=job_name,
-            run_date=run.started_at.strftime("%b %d, %Y") if run.started_at else "—",
+            run_date=run.started_at,
             workflow=wf_title,
             status=status_label,
             report_markdown=report_md,

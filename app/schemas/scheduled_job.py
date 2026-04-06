@@ -35,8 +35,8 @@ class ScheduledJobResponse(BaseModel):
     workflow_id: UUID
     workflow_title: str
     schedule_time: str
-    next_run: str
-    last_run: str
+    next_run: datetime | None = None
+    last_run: datetime | None = None
     status: str
     notify: bool = False
     enabled: bool
@@ -55,7 +55,7 @@ class ScheduledJobResponse(BaseModel):
 
 class JobHistoryResponse(BaseModel):
     id: UUID
-    run_date: str
+    run_date: datetime | None = None
     status: str
     duration: str
     workflow: str
@@ -84,7 +84,7 @@ class JobCountsResponse(BaseModel):
 class RecentRunResponse(BaseModel):
     id: UUID
     job_name: str
-    run_date: str
+    run_date: datetime | None = None
     workflow: str
     status: str
     report_markdown: str | None = None
