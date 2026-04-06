@@ -70,6 +70,13 @@ async def create_user(
     if existing.scalar_one_or_none():
         raise ValueError(f"User with NTID '{ntid_lower}' already exists")
 
+    if data.role == "assistant" and data.admin_id:
+        admin = await get_user(db, data.admin_id)
+        if not admin:
+            raise ValueError("Selected admin not found")
+        if admin.role not in (User.ROLE_ADMIN, User.ROLE_SUPER_ADMIN):
+            raise ValueError("Can only assign assistants to admin users")
+
     placeholder_email = f"{ntid_lower}@bosch.com"
     user = User(
         id=uuid.uuid4(),
@@ -80,7 +87,7 @@ async def create_user(
         first_name=data.first_name,
         last_name=data.last_name,
         role=data.role,
-        admin_id=data.admin_id,
+        admin_id=data.admin_id if data.role == "assistant" else None,
         is_active=True,
     )
     db.add(user)
@@ -97,6 +104,21 @@ async def update_user(
     user = await get_user(db, user_id)
     if not user:
         return None
+
+    new_role = data.role if data.role is not None else user.role
+    new_admin_id = data.admin_id if data.admin_id is not None else user.admin_id
+
+    if new_role == "assistant" and new_admin_id:
+        if str(new_admin_id) == str(user_id):
+            raise ValueError("A user cannot be assigned as their own assistant")
+        admin = await get_user(db, new_admin_id)
+        if not admin:
+            raise ValueError("Selected admin not found")
+        if admin.role not in (User.ROLE_ADMIN, User.ROLE_SUPER_ADMIN):
+            raise ValueError("Can only assign assistants to admin users")
+
+    if new_role != "assistant":
+        data.admin_id = None
 
     update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
