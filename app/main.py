@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
-from app.api import auth, data_sources, workflows, agents, runs, scheduled_jobs, chat
+from app.api import auth, data_sources, workflows, agents, runs, scheduled_jobs, chat, users
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-5s %(name)s — %(message)s")
 
@@ -41,6 +41,7 @@ app.include_router(agents.router, prefix="/api/agents", tags=["Agents"])
 app.include_router(runs.router, prefix="/api/runs", tags=["Runs"])
 app.include_router(scheduled_jobs.router, prefix="/api/scheduler", tags=["Scheduler"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
+app.include_router(users.router, prefix="/api/users", tags=["Users"])
 
 
 @app.get("/api/health")

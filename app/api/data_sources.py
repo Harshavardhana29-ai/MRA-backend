@@ -2,7 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.middleware.auth import get_current_user
+from app.middleware.auth import get_current_user, require_admin_or_above
 from app.models.user import User
 from app.schemas.data_source import (
     DataSourceCreate, DataSourceUpdate, DataSourceResponse,
@@ -104,3 +104,28 @@ async def delete_data_source(
     deleted = await service.delete_data_source(db, source_id, user_id=user.id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Data source not found")
+
+
+# ─── Public / Sync Endpoints ─────────────────────────────────
+
+@router.get("/public/list", response_model=DataSourceListResponse)
+async def list_public_data_sources(
+    search: str | None = Query(default=None),
+    topic: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_admin_or_above),
+):
+    return await service.list_public_data_sources(db, search=search, topic=topic)
+
+
+@router.post("/public/{source_id}/sync", response_model=DataSourceResponse, status_code=201)
+async def sync_public_data_source(
+    source_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_admin_or_above),
+):
+    try:
+        source = await service.sync_public_data_source(db, source_id, user_id=user.id)
+        return DataSourceResponse.model_validate(source)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

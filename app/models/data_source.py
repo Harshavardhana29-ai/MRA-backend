@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import (
-    Column, String, Text, DateTime, ForeignKey, Index, func,
+    Column, String, Text, DateTime, Boolean, ForeignKey, Index, func,
 )
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
@@ -19,6 +19,7 @@ class DataSource(Base):
     topic = Column(String(100), nullable=False, index=True)
     tags = Column(ARRAY(String(100)), nullable=False, default=list)
     status = Column(String(20), nullable=False, default="Active")  # Active, Processing, Error
+    is_public = Column(Boolean, nullable=False, server_default="false")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
@@ -35,4 +36,5 @@ class DataSource(Base):
         Index("idx_data_source_deleted_at", "deleted_at"),
         Index("idx_data_source_title", "title"),
         Index("idx_data_source_user_id", "user_id"),
+        Index("idx_data_source_is_public", "is_public"),
     )

@@ -1,8 +1,14 @@
 """
-FastAPI dependency for authenticating requests via JWT Bearer token.
+FastAPI dependencies for authenticating requests via JWT Bearer token
+and enforcing role-based access control.
+
 Usage:
     @router.get("/protected")
     async def protected(user: User = Depends(get_current_user)):
+        ...
+
+    @router.get("/admin-only")
+    async def admin_only(user: User = Depends(require_super_admin)):
         ...
 """
 
@@ -68,3 +74,41 @@ async def get_optional_user(
     if not token:
         return None
     return await AuthService.validate_session(db, token)
+
+
+# ─── Role-Based Permission Dependencies ──────────────────────
+
+async def require_assigned_user(
+    user: User = Depends(get_current_user),
+) -> User:
+    """Requires the user to have an assigned role (not 'user')."""
+    if not user.is_assigned:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted — you have not been assigned a role",
+        )
+    return user
+
+
+async def require_super_admin(
+    user: User = Depends(get_current_user),
+) -> User:
+    """Only super_admin can access this endpoint."""
+    if user.role != User.ROLE_SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super Admin access required",
+        )
+    return user
+
+
+async def require_admin_or_above(
+    user: User = Depends(get_current_user),
+) -> User:
+    """super_admin or admin can access this endpoint."""
+    if user.role not in (User.ROLE_SUPER_ADMIN, User.ROLE_ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return user

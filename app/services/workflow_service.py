@@ -36,6 +36,7 @@ def _build_workflow_response(workflow: Workflow) -> WorkflowResponse:
         status=workflow.status,
         source_selection_mode=workflow.source_selection_mode,
         selected_topics=workflow.selected_topics or [],
+        is_public=workflow.is_public,
         created_at=workflow.created_at,
         updated_at=workflow.updated_at,
         data_sources=data_sources,
@@ -64,6 +65,7 @@ async def create_workflow(
         status=data.status,
         source_selection_mode=data.source_selection_mode,
         selected_topics=data.selected_topics,
+        is_public=data.is_public,
     )
     db.add(workflow)
     await db.flush()
@@ -236,3 +238,64 @@ async def get_stats(db: AsyncSession, user_id: UUID | None = None) -> WorkflowSt
     agents_used = (await db.execute(agents_q)).scalar() or 0
 
     return WorkflowStats(total=total, agents_used=agents_used)
+
+
+async def list_public_workflows(
+    db: AsyncSession,
+    topic: str | None = None,
+) -> WorkflowListResponse:
+    """List all public workflows (for Admin sync)."""
+    query = _workflow_query().where(Workflow.is_public == True)
+    if topic and topic.lower() != "all":
+        query = query.where(Workflow.topic == topic)
+
+    query = query.order_by(Workflow.created_at.desc())
+    result = await db.execute(query)
+    workflows = result.scalars().unique().all()
+
+    items = [_build_workflow_response(w) for w in workflows]
+    return WorkflowListResponse(items=items, total=len(items))
+
+
+async def sync_public_workflow(
+    db: AsyncSession, workflow_id: UUID, user_id: UUID,
+) -> WorkflowResponse:
+    """Copy a public workflow into the user's own collection."""
+    query = _workflow_query().where(Workflow.id == workflow_id, Workflow.is_public == True)
+    result = await db.execute(query)
+    original = result.scalar_one_or_none()
+    if not original:
+        raise ValueError("Public workflow not found")
+
+    copy = Workflow(
+        user_id=user_id,
+        title=original.title,
+        topic=original.topic,
+        status=original.status,
+        source_selection_mode=original.source_selection_mode,
+        selected_topics=list(original.selected_topics or []),
+        is_public=False,
+    )
+    db.add(copy)
+    await db.flush()
+
+    for assoc in original.agent_associations:
+        db.add(WorkflowAgent(workflow_id=copy.id, agent_id=assoc.agent_id))
+
+    for assoc in original.data_source_associations:
+        db.add(WorkflowDataSource(workflow_id=copy.id, data_source_id=assoc.data_source_id))
+
+    await db.flush()
+
+    log = ActivityLog(
+        user_id=user_id,
+        action="Added",
+        entity_type="workflow",
+        entity_name=f"{original.title} (synced)",
+    )
+    db.add(log)
+    await db.flush()
+
+    result = await db.execute(_workflow_query().where(Workflow.id == copy.id))
+    copy = result.scalar_one()
+    return _build_workflow_response(copy)

@@ -2,7 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.middleware.auth import get_current_user
+from app.middleware.auth import get_current_user, require_admin_or_above
 from app.models.user import User
 from app.schemas.workflow import (
     WorkflowCreate, WorkflowUpdate, WorkflowResponse,
@@ -73,3 +73,26 @@ async def delete_workflow(
     deleted = await service.delete_workflow(db, workflow_id, user_id=user.id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Workflow not found")
+
+
+# ─── Public / Sync Endpoints ─────────────────────────────────
+
+@router.get("/public/list", response_model=WorkflowListResponse)
+async def list_public_workflows(
+    topic: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_admin_or_above),
+):
+    return await service.list_public_workflows(db, topic=topic)
+
+
+@router.post("/public/{workflow_id}/sync", response_model=WorkflowResponse, status_code=201)
+async def sync_public_workflow(
+    workflow_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_admin_or_above),
+):
+    try:
+        return await service.sync_public_workflow(db, workflow_id, user_id=user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

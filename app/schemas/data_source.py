@@ -11,6 +11,7 @@ class DataSourceCreate(BaseModel):
     description: str | None = None
     topic: str = Field(..., min_length=1, max_length=100)
     tags: list[str] = Field(default_factory=list)
+    is_public: bool = False
 
 
 class DataSourceUpdate(BaseModel):
@@ -20,6 +21,7 @@ class DataSourceUpdate(BaseModel):
     topic: str | None = None
     tags: list[str] | None = None
     status: str | None = None
+    is_public: bool | None = None
 
 
 # --- Response schemas ---
@@ -32,6 +34,7 @@ class DataSourceResponse(BaseModel):
     topic: str
     tags: list[str]
     status: str
+    is_public: bool = False
     created_at: datetime
     updated_at: datetime
 

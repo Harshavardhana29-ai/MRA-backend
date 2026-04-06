@@ -1,6 +1,6 @@
 import uuid
 from sqlalchemy import (
-    Column, String, Text, DateTime, ForeignKey, Index, func,
+    Column, String, Text, DateTime, Boolean, ForeignKey, Index, func,
 )
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
@@ -17,6 +17,7 @@ class Workflow(Base):
     status = Column(String(20), nullable=False, default="Draft")  # Active, Draft
     source_selection_mode = Column(String(20), nullable=False, default="topic")  # topic, both, individual, prompt_only
     selected_topics = Column(ARRAY(String(100)), nullable=False, default=list)
+    is_public = Column(Boolean, nullable=False, server_default="false")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
@@ -36,6 +37,7 @@ class Workflow(Base):
         Index("idx_workflow_status", "status"),
         Index("idx_workflow_deleted_at", "deleted_at"),
         Index("idx_workflow_user_id", "user_id"),
+        Index("idx_workflow_is_public", "is_public"),
     )
 
 

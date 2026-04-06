@@ -60,6 +60,7 @@ async def create_data_source(
         topic=data.topic,
         tags=data.tags,
         status="Active",
+        is_public=data.is_public,
     )
     db.add(source)
     await db.flush()
@@ -237,3 +238,74 @@ async def get_tags(db: AsyncSession, user_id: UUID | None = None) -> list[str]:
     all_tags = list(set(PREDEFINED_TAGS + db_tags))
     all_tags.sort()
     return all_tags
+
+
+async def list_public_data_sources(
+    db: AsyncSession,
+    search: str | None = None,
+    topic: str | None = None,
+) -> DataSourceListResponse:
+    """List all public data sources (for Admin sync)."""
+    query = select(DataSource).where(
+        DataSource.deleted_at.is_(None),
+        DataSource.is_public == True,
+    )
+    if search:
+        query = query.where(DataSource.title.ilike(f"%{search}%"))
+    if topic and topic != "All":
+        query = query.where(DataSource.topic == topic)
+
+    count_q = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_q)).scalar() or 0
+
+    query = query.order_by(DataSource.created_at.desc())
+    result = await db.execute(query)
+    items = result.scalars().all()
+
+    return DataSourceListResponse(
+        items=[DataSourceResponse.model_validate(item) for item in items],
+        total=total,
+        page=1,
+        page_size=total or 1,
+        pages=1,
+    )
+
+
+async def sync_public_data_source(
+    db: AsyncSession, source_id: UUID, user_id: UUID,
+) -> DataSource:
+    """Copy a public data source into the user's own collection."""
+    result = await db.execute(
+        select(DataSource).where(
+            DataSource.id == source_id,
+            DataSource.is_public == True,
+            DataSource.deleted_at.is_(None),
+        )
+    )
+    original = result.scalar_one_or_none()
+    if not original:
+        raise ValueError("Public data source not found")
+
+    copy = DataSource(
+        user_id=user_id,
+        url=original.url,
+        title=original.title,
+        description=original.description,
+        topic=original.topic,
+        tags=list(original.tags) + (["Public"] if "Public" not in original.tags else []),
+        status="Active",
+        is_public=False,
+    )
+    db.add(copy)
+    await db.flush()
+
+    log = ActivityLog(
+        user_id=user_id,
+        action="Added",
+        entity_type="data_source",
+        entity_name=f"{original.title} (synced)",
+    )
+    db.add(log)
+    await db.flush()
+
+    return copy

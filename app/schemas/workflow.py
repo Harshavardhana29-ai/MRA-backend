@@ -13,6 +13,7 @@ class WorkflowCreate(BaseModel):
     selected_topics: list[str] = Field(default_factory=list)
     data_source_ids: list[UUID] = Field(default_factory=list)
     agent_ids: list[UUID] = Field(default_factory=list)
+    is_public: bool = False
 
 
 class WorkflowUpdate(BaseModel):
@@ -23,6 +24,7 @@ class WorkflowUpdate(BaseModel):
     selected_topics: list[str] | None = None
     data_source_ids: list[UUID] | None = None
     agent_ids: list[UUID] | None = None
+    is_public: bool | None = None
 
 
 # --- Response schemas ---
@@ -49,6 +51,7 @@ class WorkflowResponse(BaseModel):
     status: str
     source_selection_mode: str
     selected_topics: list[str]
+    is_public: bool = False
     created_at: datetime
     updated_at: datetime
     data_sources: list[WorkflowDataSourceResponse] = Field(default_factory=list)
