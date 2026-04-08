@@ -2,7 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.middleware.auth import get_current_user
+from app.middleware.auth import get_current_user, get_effective_user_id
 from app.models.user import User
 from app.schemas.run import (
     RunWorkflowRequest, RunStartResponse, RunStatusResponse,
@@ -21,7 +21,7 @@ async def run_workflow(
     user: User = Depends(get_current_user),
 ):
     try:
-        return await service.start_run(db, workflow_id, data.user_prompt, chat_user=user)
+        return await service.start_run(db, workflow_id, data.user_prompt, chat_user=user, effective_user_id=get_effective_user_id(user))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -32,7 +32,7 @@ async def get_run(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    run = await service.get_run(db, run_id, user_id=user.id)
+    run = await service.get_run(db, run_id, user_id=get_effective_user_id(user))
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
     return run
@@ -44,7 +44,7 @@ async def get_run_status(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    status = await service.get_run_status(db, run_id, user_id=user.id)
+    status = await service.get_run_status(db, run_id, user_id=get_effective_user_id(user))
     if not status:
         raise HTTPException(status_code=404, detail="Run not found")
     return status
@@ -56,7 +56,7 @@ async def get_run_logs(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return await service.get_run_logs(db, run_id, user_id=user.id)
+    return await service.get_run_logs(db, run_id, user_id=get_effective_user_id(user))
 
 
 @router.get("/{run_id}/report")
@@ -65,7 +65,7 @@ async def get_run_report(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    report = await service.get_run_report(db, run_id, user_id=user.id)
+    report = await service.get_run_report(db, run_id, user_id=get_effective_user_id(user))
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found or run not completed")
     return {"report_markdown": report}

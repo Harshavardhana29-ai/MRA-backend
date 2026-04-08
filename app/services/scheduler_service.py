@@ -557,7 +557,7 @@ async def get_job_history(
 
 
 async def get_recent_runs(
-    db: AsyncSession, hours: int = 24, user_id: UUID | None = None,
+    db: AsyncSession, hours: int = 168, user_id: UUID | None = None,
 ) -> list:
     from datetime import timedelta
     from app.schemas.scheduled_job import RecentRunResponse

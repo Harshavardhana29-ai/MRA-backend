@@ -22,6 +22,7 @@ async def start_run(
     user_prompt: str,
     chat_session_id: UUID | None = None,
     chat_user=None,
+    effective_user_id: UUID | None = None,
 ) -> RunStartResponse:
     """Create a new run record and return its ID. Execution happens in background."""
     # Verify workflow exists
@@ -32,9 +33,12 @@ async def start_run(
     if not workflow:
         raise ValueError("Workflow not found")
 
+    # Use effective user ID (admin_id for assistants) if provided, else fall back to chat_user.id
+    owner_id = effective_user_id or (chat_user.id if chat_user else None)
+
     run = WorkflowRun(
         workflow_id=workflow_id,
-        user_id=chat_user.id if chat_user else None,
+        user_id=owner_id,
         user_prompt=user_prompt,
         status="running",
         progress=0.0,
