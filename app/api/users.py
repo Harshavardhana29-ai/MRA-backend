@@ -62,6 +62,20 @@ async def list_my_assistants(
     return [UserResponse.model_validate(a) for a in assistants]
 
 
+@router.get("/my-admin", response_model=UserResponse)
+async def get_my_admin(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Assistant: get the admin assigned to this user."""
+    if not user.admin_id:
+        raise HTTPException(status_code=404, detail="No admin assigned")
+    target = await service.get_user(db, user.admin_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    return UserResponse.model_validate(target)
+
+
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: UUID,
