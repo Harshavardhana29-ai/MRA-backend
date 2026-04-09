@@ -156,7 +156,30 @@ async def _execute_run(
                                 prompt = f"{prompt}\n\nData Sources:\n{source_context}"
 
                             # System instruction appended to every agent request
+                            current_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
                             prompt += (
+                                "\n\n--- NoTe ---"
+                                "\n\n1. Focus very carefully on the user's prompt, including timeline, sources, and specific requirements. "
+                                "If there is any conflict between system instructions and the user's request, "
+                                "the user's request must be given top priority and override all other instructions. "
+                                "The answer must strictly follow the format requested by the user."
+                                f"\n\n2. Current date and time: {current_time}. "
+                                "If the user does not specify constraints such as timeline or sources, use this current timeline "
+                                "and relevant, up-to-date sources by default. Be flexible and adapt findings based on the nature of the question."
+                                "\n\n3. For URL-based tasks:"
+                                "\n   - Explore all relevant subpages from the parent link."
+                                "\n   - Prefer using sitemap.xml where available."
+                                "\n   - Identify and rank the top 10–20 most relevant sub-links, ordered in reverse chronological order (latest to oldest) when applicable."
+                                "\n   - Do not restrict only to obvious links — analyze intelligently."
+                                "\n\n4. If the user provides multiple sub-links (n links):"
+                                "\n   - Assign each link to n concurrent sub-agents."
+                                "\n   - Within each sub-agent, use additional m parallel sub-agents to perform sitemap exploration and source discovery."
+                                "\n   - All agents must complete their tasks before compiling and returning the final response, ensuring nothing is missed."
+                                "\n\n5. Data Source Restriction:"
+                                "\n   - STRICTLY avoid using any external data sources, websites, or prior knowledge."
+                                "\n   - Use ONLY the data provided by the user (e.g., given URLs, documents, or inputs)."
+                                "\n   - Do not infer, supplement, or enrich results with outside information."
+                                "\n   - If sufficient data is not available from the user-provided sources, clearly state the limitation instead of using external data."
                                 "\n\nNote: Instead of generating responses sequentially "
                                 "from multiple agents, execute them concurrently and "
                                 "present a single, unified report that combines the "
@@ -179,7 +202,6 @@ async def _execute_run(
                                 "'rows' (array of arrays of strings/numbers)."
                                 "\n- Return ONLY valid JSON — no markdown fences, no extra text before or after the JSON."
                             )
-
                             response = await client.post(
                                 agent.api_url,
                                 json={"question": prompt},
