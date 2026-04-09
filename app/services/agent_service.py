@@ -17,14 +17,16 @@ async def list_agents(db: AsyncSession) -> list[AgentResponse]:
 
 
 async def get_agents_by_topics(db: AsyncSession, topics: list[str]) -> list[AgentResponse]:
-    """Return agents that are mapped to any of the given topics (union)."""
+    """Return agents that are mapped to any of the given topics (union).
+    Agents mapped to 'All' are always included."""
     if not topics:
         return []
 
-    # Get distinct agent IDs for the given topics
+    # Get distinct agent IDs for the given topics + agents mapped to "All"
+    lookup_topics = list(set(topics) | {"All", "all"})
     agent_ids_q = (
         select(distinct(AgentTopicMapping.agent_id))
-        .where(AgentTopicMapping.topic.in_(topics))
+        .where(AgentTopicMapping.topic.in_(lookup_topics))
     )
     result = await db.execute(agent_ids_q)
     agent_ids = [row[0] for row in result.all()]
